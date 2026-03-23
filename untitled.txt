@@ -1,0 +1,53 @@
+import streamlit as st
+import json
+from datetime import datetime
+
+# --- CONFIGURATION ---
+HISTORY_FILE = "history.json"  # historique des paris
+
+# --- FONCTIONS ---
+def load_history():
+    try:
+        with open(HISTORY_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+
+def save_history(history):
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(history, f, indent=4)
+
+def add_bet(match, pari, gain, kelly):
+    history = load_history()
+    history.append({
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "match": match,
+        "pari": pari,
+        "gain": gain,
+        "kelly_stake": kelly
+    })
+    save_history(history)
+
+# --- STREAMLIT INTERFACE ---
+st.title("Dashboard Sportif Ultime")
+
+# Formulaire pour ajouter un pari
+with st.form("add_bet_form"):
+    match = st.text_input("Match")
+    pari = st.text_input("Pari")
+    gain = st.number_input("Gain potentiel", min_value=0.0, step=0.1)
+    kelly = st.number_input("Kelly stake", min_value=0.0, step=0.01)
+    submitted = st.form_submit_button("Ajouter le pari")
+    if submitted:
+        add_bet(match, pari, gain, kelly)
+        st.success(f"Pari ajouté : {match} / {pari}")
+
+# Afficher l'historique
+st.subheader("Historique des paris")
+history = load_history()
+if history:
+    st.table(history)
+else:
+    st.write("Aucun pari pour l'instant.")
+
+# Tu peux ajouter ici tes fonctions pour value bets et probas en live
