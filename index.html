@@ -1,0 +1,46 @@
+<script>
+    const API = "https://omega-relais.onrender.com/radar";
+    const container = document.getElementById('main-container');
+
+    async function loadSport(sport, label, color, textColor) {
+        try {
+            const res = await fetch(`${API}/${sport}`);
+            const json = await res.json();
+            let items = "";
+            
+            if (json.data && json.data.length > 0) {
+                json.data.slice(0, 4).forEach(m => {
+                    items += `
+                    <div class="bg-slate-800/50 p-3 rounded mb-2 border-b border-slate-700/50 flex justify-between items-center">
+                        <span class="text-xs font-bold">${m.home_team} - ${m.away_team}</span>
+                        <span class="text-[9px] bg-slate-700 px-2 py-1 rounded">SCAN</span>
+                    </div>`;
+                });
+            } else {
+                items = `<p class="text-[10px] text-slate-600 italic">Aucun match détecté</p>`;
+            }
+
+            container.innerHTML += `
+                <div class="p-4 bg-slate-900 rounded-xl border-l-4 ${color} mb-4">
+                    <h2 class="${textColor} font-black text-[10px] mb-3 uppercase tracking-widest">${label}</h2>
+                    ${items}
+                </div>`;
+        } catch (e) {
+            console.error("Erreur sur " + sport);
+        }
+    }
+
+    async function init() {
+        container.innerHTML = '<p class="text-center text-slate-500 animate-pulse mt-10 text-xs italic">Connexion au satellite...</p>';
+        // On vide et on remplit
+        setTimeout(async () => {
+            container.innerHTML = "";
+            await loadSport('football', '⚽ FOOTBALL LIVE', 'border-green-500', 'text-green-500');
+            await loadSport('basketball', '🏀 NBA BASKET', 'border-orange-500', 'text-orange-500');
+            await loadSport('nhl', '🏒 NHL HOCKEY', 'border-sky-400', 'text-sky-400');
+        }, 1000);
+    }
+
+    init();
+</script>
+
