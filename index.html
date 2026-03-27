@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RADAR V5 ULTRA 📡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-white p-4 font-sans">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-black text-blue-500 italic">RADAR V5 <span class="text-white text-xs">ULTRA</span></h1>
+        <div class="text-[10px] text-green-400 animate-pulse">● SIGNAL LIVE</div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6">
+        <div class="border-l-4 border-green-500 bg-slate-900 p-4 rounded-r-lg shadow-lg">
+            <h2 class="text-green-500 font-bold text-sm mb-3">⚽ FOOTBALL (OVER/UNDER)</h2>
+            <div id="foot-list" class="space-y-2 text-xs text-slate-400 italic text-center">Scan en cours...</div>
+        </div>
+
+        <div class="border-l-4 border-orange-500 bg-slate-900 p-4 rounded-r-lg shadow-lg">
+            <h2 class="text-orange-500 font-bold text-sm mb-3">🏀 BASKETBALL (NBA)</h2>
+            <div id="nba-list" class="space-y-2 text-xs text-slate-400 italic text-center">En attente NBA...</div>
+        </div>
+
+        <div class="border-l-4 border-yellow-400 bg-slate-900 p-4 rounded-r-lg shadow-lg">
+            <h2 class="text-yellow-400 font-bold text-sm mb-3">🎾 TENNIS (SETS/JEUX)</h2>
+            <div id="tennis-list" class="space-y-2 text-xs text-slate-400 italic text-center">Scan ATP...</div>
+        </div>
+
+        <div class="border-l-4 border-sky-400 bg-slate-900 p-4 rounded-r-lg shadow-lg">
+            <h2 class="text-sky-400 font-bold text-sm mb-3">🏒 HOCKEY (NHL)</h2>
+            <div id="nhl-list" class="space-y-2 text-xs text-slate-400 italic text-center">Scan NHL...</div>
+        </div>
+    </div>
+
+    <script>
+        const API = "https://omega-relais.onrender.com/radar";
+
+        async function update(sport, id) {
+            try {
+                const r = await fetch(`${API}/${sport}`);
+                const j = await r.json();
+                const div = document.getElementById(id);
+                div.innerHTML = "";
+                if (j.data && j.data.length > 0) {
+                    j.data.slice(0, 3).forEach(m => {
+                        div.innerHTML += `<div class="bg-slate-800 p-2 rounded flex justify-between items-center text-white not-italic font-medium">
+                            <span>${m.home_team} - ${m.away_team}</span>
+                            <span class="text-[10px] bg-slate-700 px-2 py-1 rounded">LIVE</span>
+                        </div>`;
+                    });
+                } else { div.innerHTML = "Aucun match en cours"; }
+            } catch (e) { console.log(e); }
+        }
+
+        function refresh() {
+            update('football', 'foot-list');
+            update('basketball', 'nba-list');
+            update('tennis', 'tennis-list');
+            update('nhl', 'nhl-list');
+        }
+        setInterval(refresh, 60000);
+        refresh();
+    </script>
+</body>
+</html>
+
