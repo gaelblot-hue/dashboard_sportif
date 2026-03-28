@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>RADAR V5.2 ULTRA 📡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #020617; color: #f1f5f9; }
+        .glass { background: rgba(30,41,59,0.5); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+        .live-indicator { border-left: 4px solid #ef4444; animation: pulse 2s infinite; }
+        .alerte-card { border-left: 4px solid #a855f7; animation: alertPulse 2s infinite; }
+        @keyframes pulse { 0%,100%{background:rgba(239,68,68,0.05)} 50%{background:rgba(239,68,68,0.15)} }
+        @keyframes alertPulse { 0%,100%{background:rgba(168,85,247,0.05)} 50%{background:rgba(168,85,247,0.15)} }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+        input { text-transform: none !important; }
+    </style>
+</head>
+<body class="p-4 font-sans uppercase tracking-tighter text-[11px]">
+
+    <!-- HEADER -->
+    <div class="flex justify-between items-end mb-6 border-b border-slate-800 pb-4">
+        <div>
+            <h1 class="text-2xl font-black text-blue-500 italic">RADAR V5.2 <span class="text-white text-[10px] font-light not-italic">ULTRA</span></h1>
+            <p class="text-[8px] text-slate-500 font-mono">PACK ALL-INCLUSIVE · GITHUB DEPLOY</p>
+        </div>
+        <div class="text-right font-mono">
+            <span class="text-green-400 text-[9px] animate-pulse">● SIGNAL ACTIF</span>
+            <div id="clock" class="text-[8px] text-slate-600 italic">SYNC...</div>
+        </div>
+    </div>
+
+    <!-- ALERTES VALUE BET -->
+    <div class="mb-6">
+        <div class="flex justify-between items-center mb-3">
+            <h2 class="text-purple-400 font-black text-[10px] tracking-widest">🚨 ALERTES VALUE BET</h2>
+            <div class="flex gap-2 items-center">
+                <span id="scan-status" class="text-[8px] text-slate-600 italic">Dernier scan : --</span>
+                <button onclick="triggerScan()" id="scan-btn"
+                    class="bg-purple-600/20 text-purple-400 border border-purple-400/30 px-3 py-1 rounded-lg text-[7px] font-black hover:bg-purple-600/40 transition-all">
+                    🔍 SCANNER
+                </button>
+            </div>
+        </div>
+        <div id="alertes-display">
+            <p class="text-slate-700 italic text-[9px] ml-2">Lance un scan pour détecter les value bets...</p>
+        </div>
+    </div>
+
+    <!-- ONGLETS -->
+    <div class="flex gap-4 mb-6 border-b border-slate-800">
+        <button onclick="showTab('radar')" id="tab-radar"
+            class="pb-2 px-1 text-[9px] font-black text-blue-400 border-b-2 border-blue-400">📡 RADAR</button>
+        <button onclick="showTab('historique')" id="tab-historique"
+            class="pb-2 px-1 text-[9px] font-black text-slate-600 border-b-2 border-transparent">📊 HISTORIQUE</button>
+        <button onclick="showTab('bankroll')" id="tab-bankroll"
+            class="pb-2 px-1 text-[9px] font-black text-slate-600 border-b-2 border-transparent">💰 BANKROLL</button>
+        <button onclick="showTab('resume')" id="tab-resume"
+            class="pb-2 px-1 text-[9px] font-black text-slate-600 border-b-2 border-transparent">📋 RÉSUMÉ</button>
+        <button onclick="showTab('chat')" id="tab-chat"
+            class="pb-2 px-1 text-[9px] font-black text-slate-600 border-b-2 border-transparent">🤖 CHAT</button>
+    </div>
+
+    <!-- VUE RADAR -->
+    <div id="view-radar">
+        <div id="radar-display" class="space-y-10"></div>
+    </div>
+
+    <!-- VUE HISTORIQUE -->
+    <div id="view-historique" class="hidden">
+        <div id="stats-display" class="grid grid-cols-4 gap-2 mb-6"></div>
+        <div id="historique-display" class="space-y-2"></div>
+    </div>
+
+    <!-- VUE BANKROLL -->
+    <div id="view-bankroll" class="hidden space-y-4">
+        <div class="glass p-4 rounded-xl">
+            <h3 class="text-yellow-400 font-black text-[10px] mb-3">💰 MA BANKROLL</h3>
+            <div id="bankroll-summary"></div>
+            <div class="flex gap-2 mt-3">
+                <input id="bankroll-input" type="number" placeholder="Montant €"
+                    class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-[10px] text-white w-full">
+                <button onclick="initBankroll()"
+                    class="bg-yellow-600/20 text-yellow-400 border border-yellow-400/30 px-3 py-1.5 rounded-lg text-[7px] font-black hover:bg-yellow-600/40 whitespace-nowrap">
+                    DÉFINIR
+                </button>
+            </div>
+        </div>
+        <h3 class="text-slate-400 font-black text-[9px] tracking-widest">MISES EN COURS</h3>
+        <div id="mises-display" class="space-y-2"></div>
+    </div>
+
+    <!-- VUE RÉSUMÉ -->
+    <div id="view-resume" class="hidden space-y-4">
+        <div class="flex justify-between items-center">
+            <h2 class="text-orange-400 font-black text-[10px] tracking-widest">📋 RÉSUMÉ DU JOUR</h2>
+            <button onclick="generateResume()" id="resume-btn"
+                class="bg-orange-600/20 text-orange-400 border border-orange-400/30 px-3 py-1 rounded-lg text-[7px] font-black hover:bg-orange-600/40">
+                🔄 GÉNÉRER
+            </button>
+        </div>
+        <div id="resume-display"></div>
+    </div>
+
+    <!-- VUE CHAT -->
+    <div id="view-chat" class="hidden flex flex-col" style="height: calc(100vh - 280px)">
+        <div class="flex justify-between items-center mb-3">
+            <h2 class="text-blue-400 font-black text-[10px] tracking-widest">🤖 RADAR AI</h2>
+            <button onclick="resetChat()" class="text-slate-600 hover:text-slate-400 text-[7px] font-black">🗑️ RESET</button>
+        </div>
+        <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 mb-3 pr-1">
+            <div class="flex gap-2">
+                <div class="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-[8px] flex-shrink-0">🤖</div>
+                <div class="glass p-3 rounded-xl rounded-tl-none max-w-[85%]">
+                    <p class="text-slate-300 text-[9px] normal-case leading-relaxed">
+                        Bonjour ! Je suis RADAR AI. Pose-moi des questions sur les matchs, value bets ou ta bankroll 🎯
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <input id="chat-input" type="text" placeholder="Ex: Quel est le meilleur pari ce soir ?"
+                class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-[10px] text-white"
+                onkeydown="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()" id="chat-send"
+                class="bg-blue-600/20 text-blue-400 border border-blue-400/30 px-4 py-2 rounded-xl text-[7px] font-black hover:bg-blue-600/40">➤</button>
+        </div>
+    </div>
+
+    <!-- MODAL ANALYSE -->
+    <div id="modal-analyse" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-purple-400 font-black">🤖 ANALYSE IA</h2>
+                <button onclick="closeModal()" class="text-slate-500 hover:text-white text-lg">✕</button>
+            </div>
+            <div id="modal-content"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "https://omega-relais.onrender.com/radar";
+        const SCAN_INTERVAL = 15 * 60 * 1000;
+        let currentBankroll = null;
+
+        const SPORTS_MAP = [
+            { id: 'global_basket', label: '🏀 BASKET MONDE', color: 'text-orange-500' },
+            { id: 'global_hockey', label: '🏒 HOCKEY (NHL/EURO)', color: 'text-sky-400' },
+            { id: 'football', label: '⚽ FOOTBALL ELITE', color: 'text-green-500' },
+            { id: 'tennis', label: '🎾 TENNIS (ATP/ITF)', color: 'text-yellow-400' }
+        ];
+
+        // ========================
+        // ONGLETS
+        // ========================
+        function showTab(tab) {
+            ['radar','historique','bankroll','resume','chat'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.toggle('hidden', t !== tab);
+                const btn = document.getElementById(`tab-${t}`);
+                btn.className = `pb-2 px-1 text-[9px] font-black border-b-2 ${t === tab ? 'text-blue-400 border-blue-400' : 'text-slate-600 border-transparent'}`;
+            });
+            if (tab === 'historique') loadHistorique();
+            if (tab === 'bankroll') loadBankroll();
+            if (tab === 'resume') loadResume();
+            if (tab === 'chat') document.getElementById('chat-input').focus();
+        }
+
+        // ========================
+        // HORLOGE
+        // ========================
+        function updateClock() {
+            document.getElementById('clock').innerText = "LAST MAJ: " + new Date().toLocaleTimeString();
+        }
+
+        // ========================
+        // MODAL
+        // ========================
+        function closeModal() {
+            document.getElementById('modal-analyse').classList.add('hidden');
+            document.getElementById('modal-content').innerHTML = '';
+        }
+
+        document.getElementById('modal-analyse').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        function showLoader(title) {
+            document.getElementById('modal-content').innerHTML = `
+                <h3 class="text-white font-black text-[11px] mb-4">${title}</h3>
+                <div class="flex items-center gap-3">
+                    <div class="animate-spin w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full"></div>
+                    <span class="text-slate-400 text-[10px]">Analyse en cours...</span>
+                </div>`;
+            document.getElementById('modal-analyse').classList.remove('hidden');
+        }
+
+        function showAnalyse(match, analyse) {
+            const confColor = analyse.confiance >= 8 ? 'text-green-400' : analyse.confiance >= 7 ? 'text-yellow-400' : 'text-red-400';
+            const mise = currentBankroll?.disponible ? calculerMise(currentBankroll.disponible, analyse.confiance) : 0;
+
+            document.getElementById('modal-content').innerHTML = `
+                <h3 class="text-white font-black text-[11px] mb-4">${match.home_team} vs ${match.away_team}</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Value Bet</span>
+                        <span class="${analyse.value_bet ? 'text-green-400' : 'text-red-400'} font-black">${analyse.value_bet ? '✅ OUI' : '❌ NON'}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Confiance</span>
+                        <span class="${confColor} font-black">${analyse.confiance}/10</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Pari</span>
+                        <span class="text-white font-black text-right max-w-[60%] normal-case">${analyse.pari_recommande}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Cote</span>
+                        <span class="text-blue-400 font-black">${analyse.cote}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Bookmaker</span>
+                        <span class="text-white">${analyse.bookmaker}</span>
+                    </div>
+                    <div class="border-t border-slate-700 pt-3">
+                        <p class="text-slate-500 mb-1">Analyse</p>
+                        <p class="text-slate-300 text-[9px] normal-case leading-relaxed">${analyse.raison}</p>
+                    </div>
+                    <div class="bg-red-900/20 border border-red-500/20 rounded-lg p-2">
+                        <p class="text-red-400 text-[8px] normal-case">⚠️ ${analyse.risque}</p>
+                    </div>
+                    ${analyse.impact_meteo && analyse.impact_meteo !== 'aucun' ? `
+                    <div class="bg-blue-900/20 border border-blue-500/20 rounded-lg p-2">
+                        <p class="text-blue-400 text-[8px] normal-case">🌤️ ${analyse.impact_meteo}</p>
+                    </div>` : ''}
+                    ${analyse.value_bet && analyse.confiance >= 7 && mise > 0 ? `
+                    <button onclick="placerMise(${JSON.stringify(match).replace(/"/g, '&quot;')}, ${JSON.stringify(analyse).replace(/"/g, '&quot;')})"
+                        class="w-full mt-2 bg-yellow-600/20 text-yellow-400 border border-yellow-400/30 py-2 rounded-lg text-[8px] font-black hover:bg-yellow-600/40">
+                        💰 PLACER LA MISE (${mise}€)
+                    </button>` : ''}
+                </div>`;
+        }
+
+        // ========================
+        // ANALYSE MATCH
+        // ========================
+        async function analyzeMatch(matchJson) {
+            const match = JSON.parse(matchJson);
+            showLoader(`${match.home_team} vs ${match.away_team}`);
+            try {
+                const response = await fetch(`${API_BASE}/analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ match })
+                });
+                const json = await response.json();
+                if (json.analyse) showAnalyse(match, json.analyse);
+                else document.getElementById('modal-content').innerHTML = '<p class="text-red-400">❌ Erreur IA</p>';
+            } catch(err) {
+                document.getElementById('modal-content').innerHTML = '<p class="text-red-400">❌ Erreur de connexion</p>';
+            }
+        }
+
+        // ========================
+        // ALERTES
+        // ========================
+        async function loadAlertes() {
+            try {
+                const response = await fetch(`${API_BASE}/alertes`);
+                const json = await response.json();
+                document.getElementById('scan-status').innerText = `Dernier scan : ${json.last_scan}`;
+                const alertes = json.alertes || [];
+                if (alertes.length === 0) {
+                    document.getElementById('alertes-display').innerHTML =
+                        '<p class="text-slate-700 italic text-[9px] ml-2">Aucune alerte pour le moment...</p>';
+                    return;
+                }
+                document.getElementById('alertes-display').innerHTML = alertes.map(a => `
+                    <div class="glass alerte-card p-3 rounded-xl mb-2">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-purple-400 font-black text-[10px]">${a.match}</span>
+                                    <span class="text-[7px] bg-purple-900/40 text-purple-300 px-2 py-0.5 rounded">${a.sport.toUpperCase()}</span>
+                                </div>
+                                <p class="text-white font-black text-[9px] normal-case">💰 ${a.pari} @ ${a.cote}</p>
+                                <p class="text-slate-400 text-[8px] normal-case mt-1">${a.raison}</p>
+                                ${a.impact_meteo && a.impact_meteo !== 'aucun' ? `<p class="text-blue-400 text-[7px] normal-case mt-1">🌤️ ${a.impact_meteo}</p>` : ''}
+                                <p class="text-slate-600 text-[7px] mt-1">📚 ${a.bookmaker} · ${a.timestamp}</p>
+                            </div>
+                            <div class="text-right ml-3">
+                                <span class="text-${a.confiance >= 8 ? 'green' : 'yellow'}-400 font-black text-[14px]">${a.confiance}</span>
+                                <span class="text-slate-600 text-[7px]">/10</span>
+                            </div>
+                        </div>
+                    </div>`).join('');
+            } catch(err) { console.error("Erreur alertes :", err); }
+        }
+
+        async function triggerScan() {
+            const btn = document.getElementById('scan-btn');
+            btn.innerText = '⏳ SCAN...';
+            btn.disabled = true;
+            document.getElementById('scan-status').innerText = 'Scan en cours...';
+            try {
+                await fetch(`${API_BASE}/scan`, { method: 'POST' });
+                await loadAlertes();
+            } catch(err) { console.error("Erreur scan :", err); }
+            btn.innerText = '🔍 SCANNER';
+            btn.disabled = false;
+        }
+
+        // ========================
+        // CARTES MATCH
+        // ========================
+        async function fetchMeteo(sport_key, elId) {
+            if (!sport_key?.includes('soccer') && !sport_key?.includes('tennis')) return;
+            try {
+                const response = await fetch(`${API_BASE}/meteo/${sport_key}`);
+                const json = await response.json();
+                const el = document.getElementById(elId);
+                if (!el || !json.meteo?.length) return;
+                const m = json.meteo[0];
+                const icone = m.pluie ? '🌧️' : m.vent > 10 ? '💨' : '☀️';
+                el.innerHTML = `<span class="text-[7px] text-slate-500">${icone} ${m.temperature}°C · ${m.conditions} · Vent ${m.vent}m/s</span>`;
+            } catch(err) {}
+        }
+
+        function buildMatchCard(m) {
+            const activeSignal = m.bookmakers?.length > 0;
+            const matchJson = JSON.stringify(m).replace(/'/g, "\\'");
+            const meteoId = `meteo-${m.id}`;
+
+            let cotesHtml = '<span class="text-slate-600 italic">Pas de cotes</span>';
+            if (activeSignal) {
+                const h2h = m.bookmakers[0].markets?.find(mk => mk.key === 'h2h');
+                if (h2h) {
+                    cotesHtml = h2h.outcomes.map(o =>
+                        `<span class="bg-slate-900 px-2 py-0.5 rounded border border-white/10">
+                            <span class="text-slate-400">${o.name.split(' ').pop()}</span>
+                            <span class="text-white font-black ml-1">${o.price}</span>
+                        </span>`
+                    ).join('');
+                }
+            }
+
+            setTimeout(() => fetchMeteo(m.sport_key, meteoId), 100);
+
+            return `
+            <div class="glass p-4 rounded-xl mb-3 ${activeSignal ? 'live-indicator' : 'opacity-40'}">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <h3 class="font-black text-slate-100 text-[12px]">${m.home_team} vs ${m.away_team}</h3>
+                        <div class="flex items-center gap-2 mt-2 flex-wrap">${cotesHtml}</div>
+                        <div id="${meteoId}" class="mt-1"></div>
+                    </div>
+                    <button onclick="analyzeMatch('${matchJson.replace(/"/g, '&quot;')}')"
+                        class="ml-3 bg-purple-600/20 text-purple-400 border border-purple-400/30 px-3 py-1.5 rounded-lg text-[7px] font-black hover:bg-purple-600/40 whitespace-nowrap">
+                        🤖 IA
+                    </button>
+                </div>
+            </div>`;
+        }
+
+        // ========================
+        // RADAR
+        // ========================
+        async function updateRadar() {
+            let finalOutput = "";
+            for (const sport of SPORTS_MAP) {
+                try {
+                    const response = await fetch(`${API_BASE}/${sport.id}`);
+                    const json = await response.json();
+                    let matchCards = "";
+                    if (json.data?.length > 0) json.data.forEach(m => { matchCards += buildMatchCard(m); });
+                    finalOutput += `
+                        <div>
+                            <h2 class="${sport.color} font-black text-[10px] mb-4 tracking-widest ml-1">${sport.label}</h2>
+                            ${matchCards || '<p class="text-slate-800 italic ml-4">Recherche de signal...</p>'}
+                        </div>`;
+                } catch(err) { console.error("Signal perdu : " + sport.id); }
+            }
+            document.getElementById('radar-display').innerHTML = finalOutput;
+            updateClock();
+        }
+
+        // ========================
+        // HISTORIQUE
+        // ========================
+        async function loadHistorique() {
+            try {
+                const response = await fetch(`${API_BASE}/historique`);
+                const json = await response.json();
+                const { historique, stats } = json;
+
+                document.getElementById('stats-display').innerHTML = `
+                    <div class="glass p-3 rounded-xl text-center">
+                        <div class="text-blue-400 font-black text-[18px]">${stats.total}</div>
+                        <div class="text-slate-500 text-[7px]">ANALYSES</div>
+                    </div>
+                    <div class="glass p-3 rounded-xl text-center">
+                        <div class="text-purple-400 font-black text-[18px]">${stats.value_bets}</div>
+                        <div class="text-slate-500 text-[7px]">VALUE BETS</div>
+                    </div>
+                    <div class="glass p-3 rounded-xl text-center">
+                        <div class="text-green-400 font-black text-[18px]">${stats.wins}</div>
+                        <div class="text-slate-500 text-[7px]">WINS ✅</div>
+                    </div>
+                    <div class="glass p-3 rounded-xl text-center">
+                        <div class="text-yellow-400 font-black text-[18px]">${stats.confiance_moyenne}</div>
+                        <div class="text-slate-500 text-[7px]">CONFIANCE MOY</div>
+                    </div>`;
+
+                if (!historique.length) {
+                    document.getElementById('historique-display').innerHTML =
+                        '<p class="text-slate-700 italic text-[9px]">Aucune analyse enregistrée...</p>';
+                    return;
+                }
+
+                document.getElementById('historique-display').innerHTML = historique.map(h => `
+                    <div class="glass p-3 rounded-xl">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-white font-black text-[10px]">${h.match}</span>
+                                    <span class="text-[7px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">${h.sport}</span>
+                                </div>
+                                <p class="text-slate-300 text-[9px] normal-case">💰 ${h.pari} @ ${h.cote}</p>
+                                ${h.impact_meteo && h.impact_meteo !== 'aucun' ? `<p class="text-blue-400 text-[7px] normal-case">🌤️ ${h.impact_meteo}</p>` : ''}
+                                <p class="text-slate-600 text-[7px] mt-1">${h.timestamp} · ${h.bookmaker}</p>
+                            </div>
+                            <div class="flex flex-col items-end gap-1 ml-3">
+                                <span class="text-${h.confiance >= 8 ? 'green' : 'yellow'}-400 font-black">${h.confiance}/10</span>
+                                ${h.resultat === 'WIN' ? '<span class="text-[7px] bg-green-900/40 text-green-400 px-2 py-0.5 rounded font-black">✅ WIN</span>' :
+                                  h.resultat === 'LOSS' ? '<span class="text-[7px] bg-red-900/40 text-red-400 px-2 py-0.5 rounded font-black">❌ LOSS</span>' :
+                                  `<div class="flex gap-1">
+                                    <button onclick="markResult('${h.id}', 'WIN')" class="text-[7px] bg-green-900/20 text-green-400 border border-green-400/30 px-2 py-0.5 rounded font-black">WIN</button>
+                                    <button onclick="markResult('${h.id}', 'LOSS')" class="text-[7px] bg-red-900/20 text-red-400 border border-red-400/30 px-2 py-0.5 rounded font-black">LOSS</button>
+                                  </div>`}
+                            </div>
+                        </div>
+                    </div>`).join('');
+            } catch(err) { console.error("Erreur historique :", err); }
+        }
+
+        async function markResult(id, resultat) {
+            await fetch(`${API_BASE}/historique/resultat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, resultat })
+            });
+            loadHistorique();
+        }
+
+        // ========================
+        // BANKROLL
+        // ========================
+        function calculerMise(disponible, confiance) {
+            const pourcentages = {7: 0.02, 8: 0.04, 9: 0.06, 10: 0.08};
+            return Math.round(disponible * (pourcentages[confiance] || 0.02) * 100) / 100;
+        }
+
+        async function loadBankroll() {
+            try {
+                const response = await fetch(`${API_BASE}/bankroll`);
+                currentBankroll = await response.json();
+                renderBankroll();
+            } catch(err) { console.error("Erreur bankroll :", err); }
+        }
+
+        function renderBankroll() {
+            if (!currentBankroll?.total) {
+                document.getElementById('bankroll-summary').innerHTML =
+                    '<p class="text-slate-600 text-[9px] italic">Aucune bankroll définie</p>';
+                document.getElementById('mises-display').innerHTML = '';
+                return;
+            }
+
+            const b = currentBankroll;
+            const pct = Math.round((b.disponible / b.total) * 100);
+            const totalGain = b.mises.filter(m => m.gain !== null).reduce((acc, m) => acc + m.gain, 0);
+
+            document.getElementById('bankroll-summary').innerHTML = `
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <div class="bg-slate-900 p-2 rounded-lg text-center">
+                        <div class="text-yellow-400 font-black text-[14px]">${b.total}€</div>
+                        <div class="text-slate-600 text-[7px]">TOTAL</div>
+                    </div>
+                    <div class="bg-slate-900 p-2 rounded-lg text-center">
+                        <div class="text-green-400 font-black text-[14px]">${b.disponible}€</div>
+                        <div class="text-slate-600 text-[7px]">DISPO</div>
+                    </div>
+                    <div class="bg-slate-900 p-2 rounded-lg text-center">
+                        <div class="text-${totalGain >= 0 ? 'green' : 'red'}-400 font-black text-[14px]">${totalGain >= 0 ? '+' : ''}${totalGain.toFixed(2)}€</div>
+                        <div class="text-slate-600 text-[7px]">P&L</div>
+                    </div>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-1.5">
+                    <div class="bg-green-400 h-1.5 rounded-full" style="width:${pct}%"></div>
+                </div>
+                <p class="text-slate-600 text-[7px] mt-1">${pct}% disponible</p>`;
+
+            const misesEnCours = b.mises.filter(m => m.statut === 'EN COURS');
+            const misesTerminees = b.mises.filter(m => m.statut !== 'EN COURS');
+            let html = '';
+
+            html += misesEnCours.map(m => `
+                <div class="glass p-3 rounded-xl border-l-4 border-yellow-400">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-white font-black text-[10px]">${m.match}</p>
+                            <p class="text-slate-400 text-[8px] normal-case mt-1">💰 ${m.pari} @ ${m.cote}</p>
+                            <p class="text-yellow-400 font-black text-[9px] mt-1">Mise : ${m.montant}€ · Gain potentiel : +${(m.montant * m.cote - m.montant).toFixed(2)}€</p>
+                            <p class="text-slate-600 text-[7px]">${m.timestamp} · Confiance ${m.confiance}/10</p>
+                        </div>
+                        <div class="flex flex-col gap-1 ml-3">
+                            <button onclick="marquerMise('${m.id}','WIN')" class="text-[7px] bg-green-900/20 text-green-400 border border-green-400/30 px-2 py-1 rounded font-black">✅ WIN</button>
+                            <button onclick="marquerMise('${m.id}','LOSS')" class="text-[7px] bg-red-900/20 text-red-400 border border-red-400/30 px-2 py-1 rounded font-black">❌ LOSS</button>
+                        </div>
+                    </div>
+                </div>`).join('');
+
+            if (misesTerminees.length) {
+                html += '<h4 class="text-slate-600 text-[8px] font-black mt-4 mb-2">HISTORIQUE</h4>';
+                html += misesTerminees.slice(0, 10).map(m => `
+                    <div class="glass p-3 rounded-xl opacity-70">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-white text-[9px] font-black">${m.match}</p>
+                                <p class="text-slate-500 text-[7px] normal-case">${m.pari} @ ${m.cote} · ${m.montant}€</p>
+                            </div>
+                            <span class="text-[9px] font-black ${m.statut === 'WIN' ? 'text-green-400' : 'text-red-400'}">${m.statut === 'WIN' ? '+' : ''}${m.gain?.toFixed(2)}€</span>
+                        </div>
+                    </div>`).join('');
+            }
+
+            document.getElementById('mises-display').innerHTML = html || '<p class="text-slate-700 italic text-[9px]">Aucune mise en cours</p>';
+        }
+
+        async function initBankroll() {
+            const montant = document.getElementById('bankroll-input').value;
+            if (!montant || montant <= 0) return;
+            await fetch(`${API_BASE}/bankroll/init`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ montant: parseFloat(montant) })
+            });
+            await loadBankroll();
+            document.getElementById('bankroll-input').value = '';
+        }
+
+        async function marquerMise(id, statut) {
+            await fetch(`${API_BASE}/bankroll/resultat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, statut })
+            });
+            await loadBankroll();
+        }
+
+        async function placerMise(match, analyse) {
+            if (!currentBankroll?.total) return;
+            const montant = calculerMise(currentBankroll.disponible, analyse.confiance);
+            await fetch(`${API_BASE}/bankroll/miser`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    match: `${match.home_team} vs ${match.away_team}`,
+                    pari: analyse.pari_recommande,
+                    cote: analyse.cote,
+                    montant,
+                    confiance: analyse.confiance
+                })
+            });
+            await loadBankroll();
+            closeModal();
+            showTab('bankroll');
+        }
+
+        // ========================
+        // RÉSUMÉ
+        // ========================
+        async function loadResume() {
+            try {
+                const response = await fetch(`${API_BASE}/resume`);
+                const json = await response.json();
+                if (json.error) {
+                    document.getElementById('resume-display').innerHTML =
+                        '<p class="text-slate-700 italic text-[9px]">Aucun résumé. Clique sur GÉNÉRER !</p>';
+                    return;
+                }
+                renderResume(json);
+            } catch(err) { console.error("Erreur résumé :", err); }
+        }
+
+        function renderResume(r) {
+            const etoiles = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+            document.getElementById('resume-display').innerHTML = `
+                <div class="glass p-4 rounded-xl mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-orange-400 font-black text-[9px]">📅 ${r.date}</span>
+                        <div class="flex gap-2">
+                            ${(r.sports_chauds || []).map(s => `<span class="bg-orange-900/30 text-orange-300 text-[7px] px-2 py-0.5 rounded font-black">${s.toUpperCase()}</span>`).join('')}
+                        </div>
+                    </div>
+                    <p class="text-slate-300 text-[9px] normal-case leading-relaxed">${r.resume_general}</p>
+                </div>
+                <div class="glass p-3 rounded-xl mb-4 border-l-4 border-yellow-400">
+                    <p class="text-yellow-400 font-black text-[8px] mb-1">💡 CONSEIL DU JOUR</p>
+                    <p class="text-slate-300 text-[9px] normal-case">${r.conseil_du_jour}</p>
+                </div>
+                <h3 class="text-slate-400 font-black text-[9px] tracking-widest mb-2">🔥 TOP MATCHS DU JOUR</h3>
+                ${(r.top_matchs || []).map(m => `
+                    <div class="glass p-3 rounded-xl mb-2">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <p class="text-white font-black text-[10px]">${m.match}</p>
+                                <p class="text-slate-500 text-[7px] mb-1">${m.sport.toUpperCase()}</p>
+                                <p class="text-slate-300 text-[8px] normal-case">${m.raison}</p>
+                                <p class="text-blue-400 font-black text-[8px] mt-1">💰 ${m.pari_suggere}</p>
+                            </div>
+                            <div class="ml-3 text-right">
+                                <div class="text-yellow-400 text-[10px]">${etoiles(m.niveau_interet)}</div>
+                                <div class="text-slate-600 text-[7px]">${m.niveau_interet}/5</div>
+                            </div>
+                        </div>
+                    </div>`).join('')}`;
+        }
+
+        async function generateResume() {
+            const btn = document.getElementById('resume-btn');
+            btn.innerText = '⏳ GÉNÉRATION...';
+            btn.disabled = true;
+            try {
+                const response = await fetch(`${API_BASE}/resume/generate`, { method: 'POST' });
+                const json = await response.json();
+                if (json.resume) renderResume(json.resume);
+            } catch(err) { console.error("Erreur génération :", err); }
+            btn.innerText = '🔄 GÉNÉRER';
+            btn.disabled = false;
+        }
+
+        // ========================
+        // CHAT
+        // ========================
+        function appendMessage(role, text) {
+            const container = document.getElementById('chat-messages');
+            const isUser = role === 'user';
+            const div = document.createElement('div');
+            div.className = `flex gap-2 ${isUser ? 'flex-row-reverse' : ''}`;
+            div.innerHTML = `
+                <div class="w-5 h-5 rounded-full ${isUser ? 'bg-slate-700' : 'bg-blue-600'} flex items-center justify-center text-[8px] flex-shrink-0">${isUser ? '👤' : '🤖'}</div>
+                <div class="glass p-3 rounded-xl ${isUser ? 'rounded-tr-none bg-slate-800/80' : 'rounded-tl-none'} max-w-[85%]">
+                    <p class="text-slate-300 text-[9px] normal-case leading-relaxed whitespace-pre-wrap">${text}</p>
+                </div>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function appendLoader() {
+            const container = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.id = 'chat-loader';
+            div.className = 'flex gap-2';
+            div.innerHTML = `
+                <div class="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-[8px] flex-shrink-0">🤖</div>
+                <div class="glass p-3 rounded-xl rounded-tl-none">
+                    <div class="flex gap-1 items-center">
+                        <div class="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                        <div class="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style="animation-delay:0.2s"></div>
+                        <div class="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style="animation-delay:0.4s"></div>
+                    </div>
+                </div>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+            input.value = '';
+            document.getElementById('chat-send').disabled = true;
+            appendMessage('user', message);
+            appendLoader();
+            try {
+                const response = await fetch(`${API_BASE}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                const json = await response.json();
+                document.getElementById('chat-loader')?.remove();
+                appendMessage('assistant', json.reply || '❌ Erreur de réponse');
+            } catch(err) {
+                document.getElementById('chat-loader')?.remove();
+                appendMessage('assistant', '❌ Erreur de connexion');
+            }
+            document.getElementById('chat-send').disabled = false;
+        }
+
+        async function resetChat() {
+            await fetch(`${API_BASE}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reset: true })
+            });
+            document.getElementById('chat-messages').innerHTML = `
+                <div class="flex gap-2">
+                    <div class="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-[8px] flex-shrink-0">🤖</div>
+                    <div class="glass p-3 rounded-xl rounded-tl-none max-w-[85%]">
+                        <p class="text-slate-300 text-[9px] normal-case leading-relaxed">Conversation réinitialisée. Comment puis-je t'aider ? 🎯</p>
+                    </div>
+                </div>`;
+        }
+
+        // ========================
+        // INIT
+        // ========================
+        updateRadar();
+        loadAlertes();
+        loadBankroll();
+        setInterval(updateRadar, 60000);
+        setInterval(loadAlertes, 60000);
+        setInterval(triggerScan, SCAN_INTERVAL);
+    </script>
+</body>
+</html>
