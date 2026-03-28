@@ -1,0 +1,27 @@
+<div id="hockey-section" class="border-l-4 border-sky-400 bg-slate-900 p-3 rounded-r-lg mb-4">
+    <h2 class="text-sky-400 text-[10px] font-black tracking-widest uppercase">🏒 HOCKEY (NHL & EUROPE)</h2>
+    <div id="hockey-list" class="mt-2 space-y-2"></div>
+</div>
+
+<script>
+    // LOGIQUE DE DÉTECTION VIDÉO
+    function showVideo(matchId) {
+        alert("Chargement du Highlight... (Vérification Highlightly/Reddit)");
+        // Ici on appellera ton endpoint /video/check/
+    }
+
+    // FONCTION DE RENDU AMÉLIORÉE
+    function createMatchCard(m, type) {
+        return `
+        <div class="glass p-3 rounded flex justify-between items-center border-b border-white/5 mb-1">
+            <div>
+                <p class="text-[11px] font-bold">${m.home_team} - ${m.away_team}</p>
+                <div class="flex gap-2 mt-1">
+                    <span class="text-[8px] bg-slate-800 text-slate-400 px-1 rounded">HCP: DETECTING...</span>
+                    <button onclick="showVideo('${m.id}')" class="text-[8px] bg-blue-600 px-2 py-0.5 rounded font-bold animate-pulse">🎥 VOIR LE BUT</button>
+                </div>
+            </div>
+            <span class="text-[9px] font-mono text-green-500 italic">VALUE OK</span>
+        </div>`;
+    }
+</script>
