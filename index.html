@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RADAR V5 ULTRA 📡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #020617; }
+        .glass { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body class="text-slate-200 p-3 font-sans uppercase tracking-tight">
+    
+    <div class="flex justify-between items-center mb-6 border-b border-slate-800 pb-2">
+        <h1 class="text-2xl font-black text-blue-500 italic">RADAR V5 <span class="text-white text-[10px] font-normal not-italic tracking-normal">ULTRA</span></h1>
+        <div id="status" class="text-[10px] text-green-400 font-mono animate-pulse">● SIGNAL ACTIF</div>
+    </div>
+
+    <div id="radar-screen" class="space-y-6">
+        </div>
+
+    <script>
+        const API = "https://omega-relais.onrender.com/radar";
+        const container = document.getElementById('radar-screen');
+
+        const SPORTS = [
+            {id: 'global_basket', label: '🏀 BASKET MONDE', color: 'border-orange-500', text: 'text-orange-500'},
+            {id: 'global_hockey', label: '🏒 HOCKEY (NHL & EUROPE)', color: 'border-sky-400', text: 'text-sky-400'},
+            {id: 'football', label: '⚽ FOOTBALL (EPL/LDC)', color: 'border-green-500', text: 'text-green-500'}
+        ];
+
+        async function updateMatchList(sport) {
+            try {
+                const response = await fetch(`${API}/${sport.id}`);
+                const json = await response.json();
+                let items = "";
+
+                if (json.data && json.data.length > 0) {
+                    json.data.slice(0, 5).forEach(m => {
+                        const spreadPoint = (Math.random() * 4 + 1).toFixed(1); // Simulation
+                        items += `
+                        <div class="glass p-3 rounded-lg mb-2 flex justify-between items-center border-b border-white/5">
+                            <div>
+                                <p class="text-[11px] font-bold">${m.home_team} vs ${m.away_team}</p>
+                                <div class="flex gap-2 mt-1">
+                                    <span class="text-[8px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-white/10 font-bold">HCP: DETECTING...</span>
+                                    <button class="text-[8px] bg-blue-600 px-2 py-0.5 rounded font-bold animate-pulse text-white">🎥 HIGHLIGHT</button>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[9px] bg-green-950 text-green-400 px-1.5 py-0.5 rounded border border-green-800 italic font-black">SCAN OK</span>
+                            </div>
+                        </div>`;
+                    });
+                } else {
+                    items = `<p class="text-[10px] text-slate-600 italic pl-2">Recherche de signal en cours...</p>`;
+                }
+
+                return `
+                <div class="border-l-4 ${sport.color} pl-3">
+                    <h2 class="${sport.text} text-[10px] font-black mb-3 tracking-widest uppercase">${sport.label}</h2>
+                    ${items}
+                </div>`;
+            } catch (e) {
+                console.error("Erreur sur " + sport.id);
+                return "";
+            }
+        }
+
+        async function refresh() {
+            container.innerHTML = '<p class="text-center text-slate-600 mt-20 text-xs animate-pulse italic">Synchronisation multiplexeur...</p>';
+            let finalHtml = "";
+            for (const s of SPORTS) {
+                finalHtml += await updateMatchList(s);
+            }
+            container.innerHTML = finalHtml;
+        }
+
+        refresh();
+        setInterval(refresh, 60000);
+    </script>
+</body>
+</html>
