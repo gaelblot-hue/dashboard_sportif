@@ -546,4 +546,65 @@ def get_historique_pnl():
             "gain": mise['gain'],
             "match": mise['match']
         })
-    return jsonify({"points": points, "total_initial
+    return jsonify({"points": points, "total_initial": bankroll.get('total', 0)})
+# ============================================================
+# ENDPOINTS RÉSUMÉ
+# ============================================================
+@app.route('/radar/resume')
+def get_resume():
+    try:
+        with open(RESUME_FILE, 'r') as f:
+            return jsonify(json.load(f))
+    except:
+        return jsonify({"error": "Aucun résumé disponible"})
+
+@app.route('/radar/resume/generate', methods=['POST'])
+def generate_resume():
+    resume = generate_daily_resume()
+    if resume:
+        return jsonify({"status": "ok", "resume": resume})
+    return jsonify({"error": "Erreur génération"}), 500
+
+# ============================================================
+# ENDPOINT CHAT
+# ============================================================
+@app.route('/radar/chat', methods=['POST'])
+def chat():
+    global CHAT_HISTORY
+    data = request.get_json()
+    message = data.get('message')
+
+    if data.get('reset'):
+        CHAT_HISTORY = []
+        return jsonify({"status": "reset"})
+
+    if not message:
+        return jsonify({"error": "Message vide"}), 400
+
+    system_prompt = f"""Tu es RADAR, l'IA du dashboard paris sportifs.
+Sois bref, précis et professionnel. Réponds toujours en français.
+Bankroll disponible : {load_bankroll().get('disponible', 0)}€
+Source données : BallDontLie (NBA, NHL, MLB, NFL, MMA, EPL, La Liga, Bundesliga, Ligue 1, Serie A, Champions League, ATP, WTA)
+Météo : OpenWeatherMap"""
+
+    CHAT_HISTORY.append({"role": "user", "content": message})
+
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        response = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=400,
+            system=system_prompt,
+            messages=CHAT_HISTORY[-6:]
+        )
+        reply = response.content[0].text
+        CHAT_HISTORY.append({"role": "assistant", "content": reply})
+        return jsonify({"reply": reply})
+    except Exception as e:
+        print(f"Erreur chat : {e}")
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
+    
