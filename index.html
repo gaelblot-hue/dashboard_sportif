@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RADAR V6 ULTRA 📡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #020617; color: #f1f5f9; overflow-x: hidden; font-size: 11px; text-transform: uppercase; tracking-tighter: 0.05em; }
+        .glass { background: rgba(30,41,59,0.5); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+        .bubble-user { background: rgba(37,99,235,0.1); border: 1px solid rgba(37,99,235,0.2); }
+        .bubble-ai { background: rgba(30,41,59,0.8); border: 1px solid rgba(168,85,247,0.2); }
+        textarea { text-transform: none !important; }
+    </style>
+</head>
+<body class="p-4 font-sans">
+    <div class="flex justify-between items-end mb-6 border-b border-slate-800 pb-4">
+        <div>
+            <h1 class="text-2xl font-black text-blue-500 italic">RADAR V6 <span class="text-white text-[10px] font-light not-italic">ULTRA</span></h1>
+            <p class="text-[8px] text-slate-500 font-mono italic">GAËL PROJECT · RENDER CLOUD</p>
+        </div>
+    </div>
+
+    <div id="chat-box" class="glass p-4 rounded-xl h-[60vh] overflow-y-auto space-y-4 mb-4 border border-slate-800"></div>
+
+    <div class="flex gap-2">
+        <textarea id="chat-input" placeholder="VOTRE MESSAGE..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-[10px] outline-none focus:border-blue-500 resize-none"></textarea>
+        <button onclick="sendMessage()" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-black italic">➤</button>
+    </div>
+
+    <script>
+        const API_BASE = "https://omega-relais.onrender.com/radar";
+
+        function formatMarkdown(text) {
+            if (!text) return '';
+            return text
+                .replace(/###\s*(.+)/g, '<p class="text-cyan-400 font-black text-[10px] mt-4 mb-2 uppercase border-l-2 border-cyan-500 pl-2 tracking-widest">$1</p>')
+                .replace(/\*\*(.+?)\*\*/g, '<span class="text-white font-black">$1</span>')
+                .replace(/^-\s+(.+)/gm, '<p class="text-slate-300 text-[10px] normal-case pl-4 mb-1">● $1</p>')
+                .replace(/\n\n/g, '<div class="mb-3"></div>')
+                .replace(/\n/g, '<br>');
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if(!message) return;
+            
+            const box = document.getElementById('chat-box');
+            box.innerHTML += `<div class="flex justify-end"><div class="bubble-user p-3 rounded-xl max-w-[85%] text-[10px] text-blue-300">${message}</div></div>`;
+            input.value = '';
+            
+            try {
+                const r = await fetch(`${API_BASE}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                const json = await r.json();
+                box.innerHTML += `
+                    <div class="flex justify-start">
+                        <div class="bubble-ai p-3 rounded-xl max-w-[85%]">
+                            <p class="text-purple-400 font-black text-[8px] mb-1">🤖 RADAR AI</p>
+                            <div class="text-slate-300 normal-case text-[10px] leading-relaxed">${formatMarkdown(json.reply)}</div>
+                        </div>
+                    </div>`;
+                box.scrollTop = box.scrollHeight;
+            } catch(e) { console.error(e); }
+        }
+
+        async function updateMise(id, statut) {
+            const res = await fetch(`${API_BASE}/bankroll/resultat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, statut })
+            });
+            const json = await res.json();
+            if(json.message_ia) alert(json.message_ia);
+        }
+    </script>
+</body>
+</html>
+
