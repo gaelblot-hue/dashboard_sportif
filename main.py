@@ -1692,7 +1692,7 @@ def chat():
         user_content = message
         # Cerebras pour texte — ultra rapide
         if CEREBRAS_API_KEY:
-            model = "qwen-3-32b"
+            model = os.getenv("MODEL_NAME", "llama3.1-70b").
             chat_api_url = "https://api.cerebras.ai/v1/chat/completions"
             chat_api_key = CEREBRAS_API_KEY
         else:
@@ -1705,7 +1705,7 @@ def chat():
     try:
         messages_to_send = [{"role": "system", "content": system_prompt}]
         # Pour les messages historiques (texte seulement)
-        for msg in CHAT_HISTORY[-20:]:
+        for msg in CHAT_HISTORY[-100:]:
             content = msg["content"]
             if isinstance(content, list):
                 content = "[image analysée]"
