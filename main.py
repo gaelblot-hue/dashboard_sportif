@@ -1692,7 +1692,7 @@ def chat():
         user_content = message
         # Cerebras pour texte — ultra rapide
         if CEREBRAS_API_KEY:
-            model = os.getenv("MODEL_NAME", "llama3.1-70b").
+            model = os.getenv("MODEL_NAME", "llama3.1-70b")
             chat_api_url = "https://api.cerebras.ai/v1/chat/completions"
             chat_api_key = CEREBRAS_API_KEY
         else:
