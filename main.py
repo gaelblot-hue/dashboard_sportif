@@ -22,12 +22,10 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max
 # CLÉS API
 # ============================================================
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')  # gardé pour compatibilité
-BALLDONTLIE_KEY   = os.getenv('BALLDONTLIE_KEY')
 OPENWEATHER_KEY   = os.getenv('OPENWEATHER_KEY')
 APISPORTS_KEY     = os.getenv('APISPORTS_KEY')
 GROQ_API_KEY      = os.getenv('GROQ_API_KEY')
 CEREBRAS_API_KEY  = os.getenv('CEREBRAS_API_KEY')
-ODDS_API_KEY      = os.getenv('ODDS_API_KEY')
 
 # ============================================================
 # NTFY — Notifications push gratuites
@@ -90,127 +88,39 @@ def redis_set(key, value, ex=None):
 
 
 # ============================================================
-# ODDS API — Vraies cotes en temps réel
+# SCRAPER BOVADA (NBA/BASKET SANS CLÉ API)
 # ============================================================
-ODDS_API_BASE = "https://api.the-odds-api.com/v4"
-
-# Mapping bookmakers OddsAPI → noms Gaël
-BOOKMAKERS_MAP = {
-    "winamax_fr": "Winamax",
-    "betclic": "Betclic",
-    "betway": "Betway",
-    "unibet_fr": "Unibet",
-    "pmu": "PMU",
-}
-
-# Sports OddsAPI — clés officielles v4
-ODDS_SPORTS = {
-    # Basket
-    "nba":        "basketball_nba",
-    "euroleague": "basketball_euroleague",
-    # Foot clubs
-    "epl":        "soccer_epl",
-    "laliga":     "soccer_spain_la_liga",
-    "bundesliga": "soccer_germany_bundesliga",
-    "ligue1":     "soccer_france_ligue_1",
-    "seriea":     "soccer_italy_serie_a",
-    "ucl":        "soccer_uefa_champs_league",
-    "mls":        "soccer_usa_mls",
-    # Foot inter
-    "nations":    "soccer_uefa_nations_league",
-    # Tennis — dynamic, on cherche le tournoi en cours
-    "atp":        "tennis_atp_french_open",
-    "wta":        "tennis_wta_french_open",
-}
-
-def get_active_tennis_key(tour="atp"):
-    """Trouve le tournoi tennis en cours sur OddsAPI — cache 24h pour pas bruler le quota."""
-    cache_key = f"tennis_key_{tour}"
-    cached = get_cache(cache_key, "tennis_key")
-    if cached:
-        return cached
-    if not ODDS_API_KEY:
-        return ODDS_SPORTS.get(tour, "tennis_atp_french_open")
+def scrape_bovada_nba():
+    """Remplace OddsAPI pour avoir les cotes NBA directes et gratuites."""
+    url = "https://www.bovada.lv/services/sports/event/v1/events/list/data/basketball/nba"
+    headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15"}
     try:
-        r = requests.get(
-            f"{ODDS_API_BASE}/sports",
-            params={"apiKey": ODDS_API_KEY},
-            timeout=8
-        )
-        if r.status_code != 200:
-            return ODDS_SPORTS.get(tour)
-        sports = r.json()
-        prefix = "tennis_atp" if tour == "atp" else "tennis_wta"
-        actifs = [s["key"] for s in sports if s.get("active") and s["key"].startswith(prefix)]
-        result = actifs[0] if actifs else ODDS_SPORTS.get(tour)
-        set_cache(cache_key, result)
-        return result
-    except Exception as e:
-        print(f"Tennis key detect erreur: {e}")
-        return ODDS_SPORTS.get(tour)
-
-def fetch_odds_api(sport_key, match_teams=None):
-    """Récupère les vraies cotes depuis OddsAPI pour le bot chat."""
-    if not ODDS_API_KEY:
-        return None
-    
-    # Pour le tennis, détecter le tournoi actif dynamiquement
-    if sport_key in ("atp", "wta"):
-        odds_sport = get_active_tennis_key(sport_key)
-    else:
-        odds_sport = ODDS_SPORTS.get(sport_key, sport_key)
-    try:
-        r = requests.get(
-            f"{ODDS_API_BASE}/sports/{odds_sport}/odds",
-            params={
-                "apiKey": ODDS_API_KEY,
-                "regions": "eu",
-                "markets": "h2h,totals",
-                "oddsFormat": "decimal",
-                "dateFormat": "iso"
-            },
-            timeout=10
-        )
-        if r.status_code != 200:
-            print(f"OddsAPI erreur {r.status_code}: {r.text}")
-            return None
-        
-        games = r.json()
-        
-        # Si on cherche un match précis
-        if match_teams:
-            teams_lower = match_teams.lower()
-            for game in games:
-                home = game.get('home_team', '').lower()
-                away = game.get('away_team', '').lower()
-                if any(t in teams_lower for t in [home, away]):
-                    return format_odds_game(game)
-        
-        # Sinon retourne tous les matchs du jour
-        results = []
-        for game in games[:10]:
-            results.append(format_odds_game(game))
-        return results
-        
-    except Exception as e:
-        print(f"OddsAPI erreur : {e}")
-        return None
-
-def format_odds_game(game):
-    """Formate un match OddsAPI en dict propre."""
-    cotes = {}
-    for bookie in game.get('bookmakers', []):
-        name = bookie.get('key', '')
-        for market in bookie.get('markets', []):
-            if market.get('key') == 'h2h':
-                outcomes = {o['name']: o['price'] for o in market.get('outcomes', [])}
-                cotes[bookie.get('title', name)] = outcomes
-    return {
-        "match": f"{game.get('home_team')} vs {game.get('away_team')}",
-        "sport": game.get('sport_title'),
-        "heure": game.get('commence_time', '')[:16].replace('T', ' '),
-        "cotes": cotes
-    }
+        r = requests.get(url, headers=headers, timeout=10)
+        data = r.json()
+        matchs = []
+        for section in data:
+            for event in section.get('events', []):
+                desc = event.get('description', '')
+                home = desc.split(' @ ')[-1] if ' @ ' in desc else desc
+                away = desc.split(' @ ')[0] if ' @ ' in desc else ''
+                for group in event.get('displayGroups', []):
+                    if group.get('description') == "Game Lines":
+                        for m in group.get('markets', []):
+                            if m.get('description') == "Moneyline":
+                                out = m.get('outcomes', [])
+                                if len(out) >= 2:
+                                    matchs.append({
+                                        "id": str(event.get('id')),
+                                        "match": f"{away} vs {home}",
+                                        "home_team": home, "away_team": away,
+                                        "commence_time": datetime.fromtimestamp(event.get('startTime', 0)/1000).strftime('%Y-%m-%d %H:%M'),
+                                        "status": "scheduled",
+                                        "home_odds": out[1].get('price', {}).get('decimal'),
+                                        "away_odds": out[0].get('price', {}).get('decimal'),
+                                        "cotes": [{"bookmaker": "Bovada", "home_cote": out[1].get('price', {}).get('decimal'), "away_cote": out[0].get('price', {}).get('decimal')}]
+                                    })
+        return matchs
+    except: return []
 
 # ============================================================
 # THESPORTSDB — API gratuite multi-sports
@@ -539,372 +449,35 @@ def save_chat_history(history):
         print(f"Erreur sauvegarde chat Redis : {e}")
 
 # ============================================================
-# API-SPORTS — Fonction générique
+# FETCH SPORTS — VERSION SANS CLÉ API (BOVADA + SPORTSDB)
 # ============================================================
-APISPORTS_BASE = "https://v3.football.api-sports.io"
 
-# IDs des ligues API-Sports
-APISPORTS_LEAGUES = {
-    "epl":        {"id": 39,  "nom": "Premier League"},
-    "laliga":     {"id": 140, "nom": "La Liga"},
-    "bundesliga": {"id": 78,  "nom": "Bundesliga"},
-    "ligue1":     {"id": 61,  "nom": "Ligue 1"},
-    "seriea":     {"id": 135, "nom": "Serie A"},
-    "ucl":        {"id": 2,   "nom": "Champions League"},
-    "mls":        {"id": 253, "nom": "MLS"},
-    "amicaux":    {"id": 10,  "nom": "Matchs Amicaux"},       # Amicaux internationaux
-    "nations":    {"id": 5,   "nom": "UEFA Nations League"},  # Nations League
-    "worldcup":   {"id": 1,   "nom": "Qualif. Coupe du Monde"},
-}
-
-# Basket via api-basketball.api-sports.io
-APIBASKET_LEAGUES = {
-    "euroleague":  {"id": 120, "nom": "Euroleague"},
-    "eurocup":     {"id": 121, "nom": "EuroCup"},
-    "proA":        {"id": 116, "nom": "Pro A France"},
-    "nbl":         {"id": 8,   "nom": "NBL Australia"},
-}
-
-# Tennis via api-tennis.api-sports.io
-APITENNIS_LEAGUES = {
-    "atp": {"id": 1, "nom": "ATP Tour"},
-    "wta": {"id": 2, "nom": "WTA Tour"},
-}
-
-def apisports_get(endpoint, params={}, sport="football"):
-    cache_key = f"apisports_{sport}_{endpoint}_{str(params)}"
-    cache_type = "live" if params.get("live") else "scheduled"
-    cached = get_cache(cache_key, cache_type)
-    if cached:
-        return cached
-
-    base = f"https://v3.{sport}.api-sports.io"
-    try:
-        r = requests.get(
-            f"{base}{endpoint}",
-            headers={"x-apisports-key": APISPORTS_KEY},
-            params=params,
-            timeout=10
-        )
-        if r.status_code == 200:
-            data = r.json()
-            set_cache(cache_key, data)
-            return data
-        else:
-            print(f"❌ API-Sports {sport} {endpoint} : {r.status_code}")
-            return None
-    except Exception as e:
-        print(f"🚨 API-Sports erreur : {e}")
-        return None
-
-def fetch_football_today(league_id, with_season=True):
-    today = datetime.now().strftime("%Y-%m-%d")
-    params = {"league": league_id, "date": today}
-    if with_season:
-        params["season"] = 2025  # Saison 2025-2026 en cours
-    return apisports_get("/fixtures", params, "football")
-
-def fetch_football_live(league_id):
-    return apisports_get("/fixtures", {"league": league_id, "live": "all"}, "football")
-
-def fetch_football_odds(fixture_id):
-    cached = get_cache(f"odds_{fixture_id}", "odds")
-    if cached:
-        return cached
-    data = apisports_get("/odds", {"fixture": fixture_id, "bookmaker": 6}, "football")
-    if data:
-        set_cache(f"odds_{fixture_id}", data)
-    return data
-
-def fetch_basket_today(league_id):
-    today = datetime.now().strftime("%Y-%m-%d")
-    # Essai saison 2024-2025 en priorité (saison en cours la plupart du temps)
-    data = apisports_get("/games", {"league": league_id, "date": today, "season": "2024-2025"}, "basketball")
-    if not data or not data.get("response"):
-        # Fallback saison 2025-2026
-        data = apisports_get("/games", {"league": league_id, "date": today, "season": "2025-2026"}, "basketball")
-    if not data or not data.get("response"):
-        print(f"🔍 Aucun match programmé trouvé pour {league_id}, check du LIVE en cours...")
-        data = apisports_get("/games", {"league": league_id, "live": "all"}, "basketball")
-    return data
-
-def fetch_tennis_today():
-    today = datetime.now().strftime("%Y-%m-%d")
-    return apisports_get("/games", {"date": today}, "tennis")
-
-# ============================================================
-# BALLDONTLIE — NBA uniquement
-# ============================================================
-def bdl_get(endpoint, params={}):
-    cache_key = f"bdl_{endpoint}_{str(params)}"
-    cached = get_cache(cache_key, "scheduled")
-    if cached:
-        return cached
-    try:
-        r = requests.get(
-            f"https://api.balldontlie.io{endpoint}",
-            headers={"Authorization": BALLDONTLIE_KEY},
-            params=params,
-            timeout=10
-        )
-        if r.status_code == 200:
-            data = r.json()
-            set_cache(cache_key, data)
-            return data
-        else:
-            print(f"❌ BallDontLie {endpoint} : {r.status_code}")
-            return None
-    except Exception as e:
-        print(f"🚨 BallDontLie erreur : {e}")
-        return None
-
-def fetch_nba_today():
-    if not BALLDONTLIE_KEY:
-        return None
-    from datetime import timedelta
-    today = datetime.now().strftime("%Y-%m-%d")
-    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    # Cherche aujourd hui ET hier pour couvrir les matchs NBA de la nuit
-    data = bdl_get("/nba/v1/games", {"dates[]": today, "per_page": 15})
-    if not data or not data.get("data"):
-        data = bdl_get("/nba/v1/games", {"dates[]": yesterday, "per_page": 15})
-    return data
-
-def fetch_nba_odds():
-    # /nba/v2/odds nécessite un plan payant BallDontLie
-    return None
-
-# ============================================================
-# FETCH PAR SPORT — Retourne format unifié
-# ============================================================
 def fetch_nba():
+    """NBA via Scraping Bovada pur."""
     cached = get_cache("sport_nba", "scheduled")
-    if cached:
-        return cached
-
-    matchs = []
-    data = fetch_nba_today()
-    if not data or not data.get('data'):
-        # Fallback TheSportsDB si BallDontLie vide
-        print("BallDontLie vide → fallback TheSportsDB NBA")
-        fallback = fetch_sportsdb_events(SPORTSDB_LEAGUES.get("nba", "4387"))
-        for m in fallback:
-            m["sport_key"] = "nba"
-            m["sport_title"] = "NBA"
-        set_cache("sport_nba", fallback)
-        return fallback
-
-    # Cotes NBA
-    odds_data = fetch_nba_odds()
-    odds_map = {}
-    if odds_data and odds_data.get('data'):
-        for odd in odds_data['data']:
-            gid = odd.get('game_id')
-            if gid:
-                odds_map.setdefault(gid, []).append(odd)
-
-    for game in data['data']:
-        gid = game.get('id')
-        home = game.get('home_team', {})
-        away = game.get('visitor_team', {})
-        cotes = []
-        for odd in odds_map.get(gid, [])[:3]:
-            cotes.append({
-                "bookmaker": odd.get('book', 'Unknown'),
-                "home_cote": odd.get('home_moneyline'),
-                "away_cote": odd.get('away_moneyline'),
-                "over_under": odd.get('over_under'),
-                "spread": odd.get('home_spread')
-            })
-        matchs.append({
-            "id": str(gid),
-            "sport_key": "nba",
-            "sport_title": "NBA",
-            "commence_time": game.get('date'),
-            "home_team": home.get('full_name', '?'),
-            "away_team": away.get('full_name', '?'),
-            "status": game.get('status', 'scheduled'),
-            "score_home": game.get('home_team_score'),
-            "score_away": game.get('visitor_team_score'),
-            "cotes": cotes,
-            "source": "balldontlie"
-        })
-
+    if cached: return cached
+    matchs = scrape_bovada_nba()
+    if not matchs:
+        matchs = fetch_sportsdb_events(SPORTSDB_LEAGUES.get("nba", "4387"))
     set_cache("sport_nba", matchs)
     return matchs
 
 def fetch_football_sport(sport_id):
-    league = APISPORTS_LEAGUES.get(sport_id)
-    if not league:
-        return []
-
+    """Foot via TheSportsDB (Clé publique gratuite)."""
     cached = get_cache(f"sport_{sport_id}", "scheduled")
-    if cached:
-        return cached
-
-    matchs = []
-
-    # Matchs live
-    live_data = fetch_football_live(league["id"])
-    live_ids = set()
-    if live_data and live_data.get('response'):
-        for fix in live_data['response']:
-            teams = fix.get('teams', {})
-            goals = fix.get('goals', {})
-            fixture_id = fix.get('fixture', {}).get('id')
-            live_ids.add(fixture_id)
-            matchs.append({
-                "id": str(fixture_id),
-                "sport_key": sport_id,
-                "sport_title": league["nom"],
-                "commence_time": fix.get('fixture', {}).get('date'),
-                "home_team": teams.get('home', {}).get('name', '?'),
-                "away_team": teams.get('away', {}).get('name', '?'),
-                "status": "in_progress",
-                "score_home": goals.get('home'),
-                "score_away": goals.get('away'),
-                "cotes": [],
-                "source": "apisports"
-            })
-
-    # Pas de filtre saison pour les matchs internationaux
-    no_season = sport_id in ["amicaux", "nations", "worldcup"]
-    today_data = fetch_football_today(league["id"], with_season=not no_season)
-    if today_data and today_data.get('response'):
-        for fix in today_data['response']:
-            fixture_id = fix.get('fixture', {}).get('id')
-            if fixture_id in live_ids:
-                continue
-            teams  = fix.get('teams', {})
-            goals  = fix.get('goals', {})
-            status = fix.get('fixture', {}).get('status', {}).get('short', 'NS')
-
-            if status in ['FT', 'AET', 'PEN']:
-                continue  # On n'affiche pas les matchs terminés
-
-            # Cotes (1 requête par match — on limite aux 5 premiers)
-            cotes = []
-            if len(matchs) < 5:
-                odds_data = fetch_football_odds(fixture_id)
-                if odds_data and odds_data.get('response'):
-                    for bookmaker in odds_data['response'][:1]:
-                        for book in bookmaker.get('bookmakers', [])[:1]:
-                            for bet in book.get('bets', []):
-                                if bet.get('name') == 'Match Winner':
-                                    vals = {v['value']: v['odd'] for v in bet.get('values', [])}
-                                    cotes.append({
-                                        "bookmaker": book.get('name', '?'),
-                                        "home_cote": vals.get('Home'),
-                                        "away_cote": vals.get('Away'),
-                                        "draw_cote": vals.get('Draw'),
-                                        "over_under": None,
-                                        "spread": None
-                                    })
-
-            matchs.append({
-                "id": str(fixture_id),
-                "sport_key": sport_id,
-                "sport_title": league["nom"],
-                "commence_time": fix.get('fixture', {}).get('date'),
-                "home_team": teams.get('home', {}).get('name', '?'),
-                "away_team": teams.get('away', {}).get('name', '?'),
-                "status": "scheduled" if status == 'NS' else "in_progress",
-                "score_home": goals.get('home'),
-                "score_away": goals.get('away'),
-                "cotes": cotes,
-                "source": "apisports"
-            })
-
-    # Pas de fallback TheSportsDB pour le foot
-    # (garder uniquement API-Sports pour éviter les mauvais matchs)
-
+    if cached: return cached
+    league_id = SPORTSDB_LEAGUES.get(sport_id)
+    matchs = fetch_sportsdb_events(league_id) if league_id else []
     set_cache(f"sport_{sport_id}", matchs)
     return matchs
 
 def fetch_basket_sport(sport_id):
-    league = APIBASKET_LEAGUES.get(sport_id)
-    if not league:
-        return []
-
-    cached = get_cache(f"sport_{sport_id}", "live")
-    if cached:
-        return cached
-
-    matchs = []
-    data = fetch_basket_today(league["id"])
-
-    if data and data.get("response"):
-        for game in data["response"]:
-            teams  = game.get("teams", {})
-            scores = game.get("scores", {})
-            status = game.get("status", {}).get("short", "NS")
-            if status == "FT":
-                continue
-            matchs.append({
-                "id": str(game.get("id")),
-                "sport_key": sport_id,
-                "sport_title": league["nom"],
-                "commence_time": game.get("date"),
-                "home_team": teams.get("home", {}).get("name", "?"),
-                "away_team": teams.get("away", {}).get("name", "?"),
-                "status": "in_progress" if status != "NS" else "scheduled",
-                "score_home": scores.get("home", {}).get("total"),
-                "score_away": scores.get("away", {}).get("total"),
-                "cotes": [],
-                "source": "apisports"
-            })
-
-    # Pas de fallback TheSportsDB pour le basket
-    # (les IDs TheSportsDB retournent des mauvais matchs)
-
-    set_cache(f"sport_{sport_id}", matchs)
-    return matchs
+    """Basket Europe via TheSportsDB."""
+    return fetch_football_sport(sport_id)
 
 def fetch_tennis_sport(sport_id):
-    league = APITENNIS_LEAGUES.get(sport_id)
-    if not league:
-        return []
-
-    cached = get_cache(f"sport_{sport_id}", "scheduled")
-    if cached:
-        return cached
-
-    matchs = []
-    data = fetch_tennis_today()
-    if data and data.get('response'):
-        for game in data['response']:
-            # Filtre ATP ou WTA selon le sport_id
-            tournament = game.get('tournament', {})
-            league_name = tournament.get('name', '').lower()
-            if sport_id == 'atp' and 'wta' in league_name:
-                continue
-            if sport_id == 'wta' and 'wta' not in league_name:
-                continue
-
-            players = game.get('players', [])
-            home = players[0].get('player', {}) if len(players) > 0 else {}
-            away = players[1].get('player', {}) if len(players) > 1 else {}
-            status = game.get('status', {}).get('short', 'NS')
-
-            if status == 'FIN':
-                continue
-
-            matchs.append({
-                "id": str(game.get('id')),
-                "sport_key": sport_id,
-                "sport_title": league["nom"],
-                "commence_time": game.get('date'),
-                "home_team": home.get('name', '?'),
-                "away_team": away.get('name', '?'),
-                "status": "in_progress" if status == 'LIVE' else "scheduled",
-                "score_home": None,
-                "score_away": None,
-                "cotes": [],
-                "source": "apisports"
-            })
-
-    set_cache(f"sport_{sport_id}", matchs)
-    return matchs
+    """Tennis via TheSportsDB."""
+    return fetch_football_sport(sport_id)
 
 # ============================================================
 # MÉTÉO
@@ -1282,14 +855,16 @@ def test_live():
 # ============================================================
 @app.route('/radar/<sport_id>')
 def get_sport(sport_id):
+    # 🏀 NBA : Scraping pur (Zéro clé API)
     if sport_id == "nba":
         return jsonify({"data": fetch_nba()})
-    elif sport_id in APISPORTS_LEAGUES:
-        return jsonify({"data": fetch_football_sport(sport_id)})
-    elif sport_id in APIBASKET_LEAGUES:
-        return jsonify({"data": fetch_basket_sport(sport_id)})
-    elif sport_id in APITENNIS_LEAGUES:
-        return jsonify({"data": fetch_tennis_sport(sport_id)})
+    
+    # ⚽ FOOT & BASKET EUROPE : Fallback sur TheSportsDB (Clé "3" gratuite)
+    elif sport_id in SPORTSDB_LEAGUES:
+        league_id = SPORTSDB_LEAGUES.get(sport_id)
+        matchs = fetch_sportsdb_events(league_id)
+        return jsonify({"data": matchs, "source": "thesportsdb"})
+    
     else:
         return jsonify({"data": []})
 
